@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Unity Bear Controller - WebGL</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #gameContainer {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #unityContainer {
+            width: 100%;
+            height: 100%;
+            background: #232323;
+        }
+        
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        #loadingBar {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+        
+        #loadingText {
+            margin-bottom: 10px;
+        }
+        
+        #progressBarEmpty {
+            width: 200px;
+            height: 20px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+        
+        #progressBarFull {
+            width: 0%;
+            height: 100%;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.3s ease;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        /* GitHub Pages 환경 최적화 */
+        canvas {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="unityContainer">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        
+        <div id="loadingBar">
+            <div id="loadingText">Unity Bear 로딩 중...</div>
+            <div id="progressBarEmpty">
+                <div id="progressBarFull"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // React Native WebView 통신을 위한 전역 함수
+        function SendMessageToReactNative(message) {
+            console.log('Unity → RN:', message);
+            
+            // React Native WebView로 메시지 전송
+            if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(message);
+            } else {
+                console.log('ReactNativeWebView not available (테스트 환경)');
+                // 웹 브라우저에서 테스트할 때는 콘솔에만 출력
+            }
+        }
+
+        // Unity 인스턴스 전역 변수
+        var unityInstance;
+        var gameLoaded = false;
+
+        // 로딩 UI 업데이트
+        function updateLoadingProgress(progress) {
+            const progressBar = document.getElementById('progressBarFull');
+            const loadingText = document.getElementById('loadingText');
+            
+            progressBar.style.width = (progress * 100) + '%';
+            
+            if (progress < 0.3) {
+                loadingText.textContent = 'Unity 엔진 초기화 중...';
+            } else if (progress < 0.7) {
+                loadingText.textContent = 'Bear 에셋 로딩 중...';
+            } else if (progress < 0.9) {
+                loadingText.textContent = '마지막 준비 중...';
+            } else {
+                loadingText.textContent = '거의 완료되었습니다!';
+            }
+        }
+
+        // Unity 로딩 완료 처리
+        function onUnityLoaded() {
+            console.log('Unity Bear 로딩 완료!');
+            
+            // 로딩 바 숨기기
+            const loadingBar = document.getElementById('loadingBar');
+            loadingBar.classList.add('hidden');
+            
+            gameLoaded = true;
+            
+            // React Native에 로딩 완료 알림
+            SendMessageToReactNative(JSON.stringify({
+                type: 'UNITY_LOADED',
+                message: 'Unity Bear Controller ready',
+                timestamp: Date.now()
+            }));
+        }
+
+        // React Native에서 Unity로 명령 전송받는 함수
+        window.sendCommandToUnity = function(gameObject, method, data) {
+            if (!gameLoaded || !unityInstance) {
+                console.log('Unity 아직 준비되지 않음');
+                return;
+            }
+            
+            console.log('RN → Unity:', gameObject, method, data);
+            
+            try {
+                // JSON 문자열로 변환하여 전송
+                const jsonData = JSON.stringify({
+                    gameObject: gameObject,
+                    method: method,
+                    data: data,
+                    timestamp: Date.now()
+                });
+                
+                unityInstance.SendMessage(gameObject, method, jsonData);
+            } catch (error) {
+                console.error('Unity 명령 전송 오류:', error);
+            }
+        };
+
+        // Unity WebGL 설정
+        const buildUrl = "./Build";
+        const config = {
+            dataUrl: "./Build/Build.data.gz",
+            frameworkUrl: "./Build/Build.framework.js.gz",
+            codeUrl: "./Build/Build.wasm.gz",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "SSAFY",
+            productName: "Bear Controller",
+            productVersion: "1.0.0",
+        };
+
+        // Unity 초기화 (실제 Unity 빌드가 있을 때 활성화)
+        function initializeUnity() {
+            const canvas = document.querySelector("#gameCanvas");
+            
+            // 일단 시뮬레이션으로 로딩 진행 (실제 Unity 빌드 전까지)
+            simulateUnityLoading();
+            
+            /* 실제 Unity 빌드가 있을 때 사용할 코드:
+            createUnityInstance(canvas, config, (progress) => {
+                updateLoadingProgress(progress);
+            }).then((instance) => {
+                unityInstance = instance;
+                window.unityInstance = instance;
+                onUnityLoaded();
+            }).catch((message) => {
+                alert("Unity 로딩 실패: " + message);
+            });
+            */
+        }
+
+        // Unity 로딩 시뮬레이션 (테스트용)
+        function simulateUnityLoading() {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 0.02;
+                updateLoadingProgress(progress);
+                
+                if (progress >= 1) {
+                    clearInterval(interval);
+                    
+                    // 시뮬레이션 Unity 인스턴스 생성
+                    unityInstance = {
+                        SendMessage: function(gameObject, method, data) {
+                            console.log(`시뮬레이션: ${gameObject}.${method}(${data})`);
+                            
+                            // Bear 동작 시뮬레이션
+                            if (gameObject === 'BearSwitcher' && method === 'OnReactNativeMessage') {
+                                const message = JSON.parse(data);
+                                
+                                setTimeout(() => {
+                                    if (message.data === '1' || message.data === '2' || message.data === '3') {
+                                        SendMessageToReactNative(JSON.stringify({
+                                            action: 'showBearStudy',
+                                            message: `Bear 모드 ${message.data} 활성화!`,
+                                            bearMode: message.data,
+                                            vibrate: true,
+                                            vibrationPattern: [0, 200, 100, 200]
+                                        }));
+                                    }
+                                }, 500);
+                            }
+                        }
+                    };
+                    
+                    window.unityInstance = unityInstance;
+                    onUnityLoaded();
+                }
+            }, 50);
+        }
+
+        // 페이지 로드 시 Unity 초기화
+        window.addEventListener('load', initializeUnity);
+
+        // GitHub Pages에서 상대 경로 문제 해결
+        window.addEventListener('DOMContentLoaded', function() {
+            // GitHub Pages 환경에서 경로 조정
+            if (window.location.hostname.includes('github.io')) {
+                console.log('GitHub Pages 환경 감지됨');
+            }
+        });
+    </script>
+</body>
+</html>
