@@ -1,379 +1,540 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Unity Bear Controller - WebGL</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaPipe Motion Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background: #1a1a1a;
-            font-family: Arial, sans-serif;
+            background: #000;
             overflow: hidden;
+            font-family: monospace;
         }
         
-        #gameContainer {
+        #container {
+            position: relative;
             width: 100vw;
             height: 100vh;
-            position: relative;
         }
         
-        #unityContainer {
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            background: #232323;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            object-fit: cover;
+            transform: scaleX(-1); /* 거울 효과 */
         }
         
-        /* 시각적 Bear 표현 */
-        #visualBear {
-            width: 120px;
-            height: 120px;
-            background: #8B4513;
-            border-radius: 50%;
-            position: relative;
-            transition: all 0.5s ease;
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        #status {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 10;
+        }
+        
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+        
+        button {
+            background: rgba(0,0,0,0.8);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            margin: 2px;
+            border-radius: 4px;
             cursor: pointer;
+            font-size: 12px;
         }
         
-        /* Bear 귀 */
-        #visualBear::before {
-            content: '';
-            position: absolute;
-            top: -15px;
-            left: 20px;
-            width: 25px;
-            height: 25px;
-            background: #8B4513;
-            border-radius: 50%;
-            box-shadow: 50px 0 0 #8B4513;
+        button:hover {
+            background: rgba(0,0,0,0.9);
         }
         
-        /* Bear 얼굴 */
-        #visualBear::after {
-            content: '🐻';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 60px;
-        }
-        
-        /* Bear 모드별 색상 */
-        .bear-mode-1 { 
-            background: #4169E1 !important; 
-            transform: scale(1.2) rotate(90deg);
-        }
-        .bear-mode-2 { 
-            background: #32CD32 !important; 
-            transform: scale(1.1) rotate(180deg);
-        }
-        .bear-mode-3 { 
-            background: #FF6347 !important; 
-            transform: scale(1.3) rotate(270deg);
-        }
-        
-        /* Bear 상태 표시 */
-        #bearStatus {
-            position: absolute;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-size: 16px;
-            font-weight: bold;
-        }
-        
-        #gameCanvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        
-        #loadingBar {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            color: white;
-        }
-        
-        #loadingText {
-            margin-bottom: 10px;
-        }
-        
-        #progressBarEmpty {
-            width: 200px;
-            height: 20px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.2);
-            position: relative;
-        }
-        
-        #progressBarFull {
-            width: 0%;
-            height: 100%;
-            border-radius: 10px;
-            background: linear-gradient(90deg, #4CAF50, #8BC34A);
-            transition: width 0.3s ease;
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        /* GitHub Pages 환경 최적화 */
-        canvas {
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: -moz-crisp-edges;
-            image-rendering: crisp-edges;
+        button.active {
+            background: #4CAF50;
         }
     </style>
 </head>
 <body>
-    <div id="gameContainer">
-        <div id="unityContainer">
-            <!-- 시각적 Bear 표현 -->
-            <div id="visualBear"></div>
-            <div id="bearStatus">Bear 대기 중...</div>
-            <canvas id="gameCanvas" style="display: none;"></canvas>
+    <div id="container">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="canvas"></canvas>
+        
+        <div id="status">
+            <div>FaceMesh: <span id="facemesh-status">초기화 중...</span></div>
+            <div>얼굴: <span id="face-count">0</span></div>
+            <div>프레임: <span id="frame-count">0</span></div>
+            <div>유효 데이터: <span id="valid-count">0</span></div>
+            <div>WebSocket: <span id="ws-status">연결 안됨</span></div>
+            <div>큐 크기: <span id="queue-size">0</span></div>
         </div>
         
-        <div id="loadingBar">
-            <div id="loadingText">Unity Bear 로딩 중...</div>
-            <div id="progressBarEmpty">
-                <div id="progressBarFull"></div>
-            </div>
+        <div id="controls">
+            <button id="start-btn" onclick="startCapture()">시작</button>
+            <button id="stop-btn" onclick="stopCapture()">중지</button>
         </div>
     </div>
 
     <script>
-        // React Native WebView 통신을 위한 전역 함수
-        function SendMessageToReactNative(message) {
-            console.log('Unity → RN:', message);
+        // ===== 전역 변수 =====
+        const STUDY_BASE = 'https://i13c201.p.ssafy.io/study';
+        
+        // 랜드마크 인덱스 (Python 코드와 동일)
+        const STANDARD_FACE_LANDMARKS = [
+            33, 133, 159, 145, 158, 153,      // Right Eye (6)
+            263, 362, 386, 374, 385, 380      // Left Eye  (6)
+        ];
+        const MOUTH_LANDMARKS = [78, 308, 13, 14];          // 4
+        const HEAD_POSE_LANDMARKS = [1, 152, 10, 33, 263];  // 5
+        
+        const COLLECTION_INTERVAL_MS = 1000;   // 좌표 수집 throttle
+        const BATCH_FLUSH_MS = 10000;          // 배치 전송 주기
+        
+        // 상태 변수
+        let video, canvas, ctx;
+        let faceMesh;
+        let camera;
+        let isActive = false;
+        let frameCount = 0;
+        let validDataCount = 0;
+        let faceCount = 0;
+        let lastEnqueueTime = 0;
+        
+        // WebSocket 관련
+        let socket = null;
+        let isConnected = false;
+        let isSubscribed = false;
+        let wsStatus = 'disconnected';
+        
+        // 배치 큐
+        let motionQueue = [];
+        let batchTimer = null;
+        
+        // URL 파라미터에서 값 추출
+        const urlParams = new URLSearchParams(window.location.search);
+        const studyRoomId = urlParams.get('studyRoomId') || '24';
+        const myUserId = urlParams.get('myUserId') || '12';
+        const accessToken = urlParams.get('accessToken') || '';
+        
+        // ===== 초기화 =====
+        window.onload = function() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
             
-            // React Native WebView로 메시지 전송
-            if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(message);
+            updateStatus('facemesh-status', '초기화 중...');
+            initializeFaceMesh();
+        };
+        
+        // ===== MediaPipe FaceMesh 초기화 =====
+        function initializeFaceMesh() {
+            faceMesh = new FaceMesh({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+                }
+            });
+            
+            faceMesh.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            
+            faceMesh.onResults(onFaceMeshResults);
+            updateStatus('facemesh-status', '완료');
+        }
+        
+        // ===== FaceMesh 결과 처리 =====
+        function onFaceMeshResults(results) {
+            frameCount++;
+            updateStatus('frame-count', frameCount);
+            
+            // 캔버스 크기 조정
+            canvas.width = results.image.width;
+            canvas.height = results.image.height;
+            
+            // 배경 이미지 그리기 (거울 효과)
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(results.image, -canvas.width, 0, canvas.width, canvas.height);
+            ctx.restore();
+            
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                faceCount = results.multiFaceLandmarks.length;
+                updateStatus('face-count', faceCount);
+                
+                const landmarks = results.multiFaceLandmarks[0];
+                
+                // 좌표 추출
+                const eyeLandmarks = extractLandmarks(landmarks, STANDARD_FACE_LANDMARKS);
+                const mouthLandmarks = extractLandmarks(landmarks, MOUTH_LANDMARKS);
+                const headPoseLandmarks = extractLandmarks(landmarks, HEAD_POSE_LANDMARKS);
+                
+                const valid = (eyeLandmarks.length === 12 && mouthLandmarks.length === 4 && headPoseLandmarks.length === 5);
+                
+                if (valid) {
+                    validDataCount++;
+                    updateStatus('valid-count', validDataCount);
+                    
+                    const now = Date.now();
+                    if (now - lastEnqueueTime >= COLLECTION_INTERVAL_MS) {
+                        lastEnqueueTime = now;
+                        
+                        const motionData = {
+                            studyRoomId: parseInt(studyRoomId),
+                            eyeLandmarks: eyeLandmarks,
+                            mouthLandmarks: mouthLandmarks,
+                            headPoseLandmarks: headPoseLandmarks
+                        };
+                        
+                        motionQueue.push(motionData);
+                        updateStatus('queue-size', motionQueue.length);
+                        
+                        console.log('FaceMesh 좌표 수집:', {
+                            눈_좌표: eyeLandmarks.length,
+                            입_좌표: mouthLandmarks.length,
+                            머리_좌표: headPoseLandmarks.length,
+                            유효성: valid
+                        });
+                    }
+                }
+                
+                // 랜드마크 그리기 (선택사항)
+                drawLandmarks(landmarks);
             } else {
-                console.log('ReactNativeWebView not available (테스트 환경)');
-                // 웹 브라우저에서 테스트할 때는 콘솔에만 출력
+                faceCount = 0;
+                updateStatus('face-count', faceCount);
             }
         }
-
-        // Unity 인스턴스 전역 변수
-        var unityInstance;
-        var gameLoaded = false;
-
-        // 로딩 UI 업데이트
-        function updateLoadingProgress(progress) {
-            const progressBar = document.getElementById('progressBarFull');
-            const loadingText = document.getElementById('loadingText');
-            
-            progressBar.style.width = (progress * 100) + '%';
-            
-            if (progress < 0.3) {
-                loadingText.textContent = 'Unity 엔진 초기화 중...';
-            } else if (progress < 0.7) {
-                loadingText.textContent = 'Bear 에셋 로딩 중...';
-            } else if (progress < 0.9) {
-                loadingText.textContent = '마지막 준비 중...';
-            } else {
-                loadingText.textContent = '거의 완료되었습니다!';
+        
+        // ===== 랜드마크 추출 =====
+        function extractLandmarks(allLandmarks, indices) {
+            return indices.map(i => {
+                const point = allLandmarks[i];
+                if (point && typeof point.x === 'number' && typeof point.y === 'number') {
+                    return [round4(point.x), round4(point.y)];
+                }
+                return null;
+            }).filter(Boolean);
+        }
+        
+        // ===== 랜드마크 그리기 =====
+        function drawLandmarks(landmarks) {
+            ctx.fillStyle = 'red';
+            landmarks.forEach((landmark) => {
+                const x = (1 - landmark.x) * canvas.width; // 거울 효과 적용
+                const y = landmark.y * canvas.height;
+                ctx.beginPath();
+                ctx.arc(x, y, 2, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+        }
+        
+        // ===== 카메라 시작 =====
+        async function startCapture() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                });
+                
+                video.srcObject = stream;
+                
+                camera = new Camera(video, {
+                    onFrame: async () => {
+                        if (isActive) {
+                            await faceMesh.send({ image: video });
+                        }
+                    },
+                    width: 640,
+                    height: 480
+                });
+                
+                isActive = true;
+                camera.start();
+                
+                // WebSocket 연결
+                connectWebSocket();
+                
+                // 배치 타이머 시작
+                if (!batchTimer) {
+                    batchTimer = setInterval(flushBatch, BATCH_FLUSH_MS);
+                }
+                
+                // 세션 시작
+                startMotionSession();
+                
+                document.getElementById('start-btn').classList.add('active');
+                document.getElementById('stop-btn').classList.remove('active');
+                
+            } catch (err) {
+                console.error('카메라 시작 실패:', err);
+                alert('카메라 접근 권한이 필요합니다.');
             }
         }
-
-        // Unity 로딩 완료 처리
-        function onUnityLoaded() {
-            console.log('Unity Bear 로딩 완료!');
+        
+        // ===== 카메라 중지 =====
+        function stopCapture() {
+            isActive = false;
             
-            // 로딩 바 숨기기
-            const loadingBar = document.getElementById('loadingBar');
-            loadingBar.classList.add('hidden');
+            if (camera) {
+                camera.stop();
+            }
             
-            gameLoaded = true;
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
             
-            // React Native에 로딩 완료 알림
-            SendMessageToReactNative(JSON.stringify({
-                type: 'UNITY_LOADED',
-                message: 'Unity Bear Controller ready',
-                timestamp: Date.now()
-            }));
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+            
+            if (batchTimer) {
+                clearInterval(batchTimer);
+                batchTimer = null;
+            }
+            
+            document.getElementById('start-btn').classList.remove('active');
+            document.getElementById('stop-btn').classList.add('active');
+            
+            updateStatus('ws-status', '연결 안됨');
         }
-
-        // React Native에서 Unity로 명령 전송받는 함수
-        window.sendCommandToUnity = function(gameObject, method, data) {
-            console.log('RN → Unity:', gameObject, method, data);
-            
-            // 시각적 Bear 업데이트
-            updateVisualBear(data);
-            
-            if (!gameLoaded || !unityInstance) {
-                console.log('Unity 아직 준비되지 않음 (시각적 Bear로 대체)');
+        
+        // ===== WebSocket 연결 =====
+        function connectWebSocket() {
+            if (!accessToken || !studyRoomId) {
+                console.warn('토큰 또는 스터디룸 ID가 없습니다.');
                 return;
             }
             
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+            
             try {
-                // JSON 문자열로 변환하여 전송
-                const jsonData = JSON.stringify({
-                    gameObject: gameObject,
-                    method: method,
-                    data: data,
-                    timestamp: Date.now()
+                const sockUrl = `${STUDY_BASE}/ws-stomp?token=${encodeURIComponent(accessToken)}`;
+                updateStatus('ws-status', '연결 중...');
+                
+                socket = new SockJS(sockUrl);
+                
+                socket.onopen = function() {
+                    const connectFrame = 
+                        `CONNECT\n` +
+                        `accept-version:1.0,1.1,2.0\n` +
+                        `heart-beat:10000,10000\n` +
+                        `\n\u0000`;
+                    socket.send(connectFrame);
+                };
+                
+                socket.onmessage = function(event) {
+                    const data = String(event.data || '');
+                    if (!data.trim()) return;
+                    
+                    if (data.startsWith('CONNECTED')) {
+                        isConnected = true;
+                        updateStatus('ws-status', '연결됨');
+                        
+                        // 모션 채널 구독
+                        const motionSubFrame = 
+                            `SUBSCRIBE\n` +
+                            `id:motion-sub-${studyRoomId}\n` +
+                            `destination:/sub/motion/study/${studyRoomId}\n` +
+                            `\n\u0000`;
+                        socket.send(motionSubFrame);
+                        
+                        isSubscribed = true;
+                        updateStatus('ws-status', '구독완료');
+                        return;
+                    }
+                    
+                    if (data.startsWith('MESSAGE')) {
+                        const body = extractStompBody(data);
+                        if (!body) return;
+                        
+                        try {
+                            const payload = JSON.parse(body);
+                            
+                            // 모션 데이터 처리
+                            if (data.includes(`/sub/motion/study/${studyRoomId}`)) {
+                                console.log('모션 상태 수신:', payload);
+                                
+                                // React Native로 메시지 전송 (WebView에서 부모로)
+                                if (window.ReactNativeWebView) {
+                                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                                        type: 'motion_update',
+                                        data: payload
+                                    }));
+                                }
+                            }
+                        } catch (e) {
+                            console.error('JSON 파싱 실패:', e);
+                        }
+                        return;
+                    }
+                    
+                    if (data.startsWith('ERROR')) {
+                        isConnected = false;
+                        isSubscribed = false;
+                        updateStatus('ws-status', '에러');
+                        tryReconnect();
+                        return;
+                    }
+                };
+                
+                socket.onerror = function(err) {
+                    console.error('WebSocket 에러:', err);
+                    updateStatus('ws-status', '에러');
+                };
+                
+                socket.onclose = function(event) {
+                    isConnected = false;
+                    isSubscribed = false;
+                    updateStatus('ws-status', '연결 끊김');
+                    socket = null;
+                    tryReconnect();
+                };
+                
+            } catch (e) {
+                console.error('WebSocket 연결 실패:', e);
+                socket = null;
+                tryReconnect();
+            }
+        }
+        
+        // ===== 재연결 시도 =====
+        function tryReconnect() {
+            setTimeout(() => {
+                if (!isConnected && isActive) {
+                    connectWebSocket();
+                }
+            }, 2000);
+        }
+        
+        // ===== 배치 전송 =====
+        function flushBatch() {
+            try {
+                if (!socket || !isConnected || motionQueue.length === 0) {
+                    return;
+                }
+                
+                const batchMessage = {
+                    studyRoomId: parseInt(studyRoomId),
+                    batchTimestamp: new Date().toISOString(),
+                    dataPoints: motionQueue.splice(0, motionQueue.length)
+                };
+                
+                const frame = 
+                    `SEND\n` +
+                    `destination:/pub/motion/batch\n` +
+                    `content-type:application/json\n` +
+                    `\n` +
+                    `${JSON.stringify(batchMessage)}\u0000`;
+                
+                socket.send(frame);
+                updateStatus('queue-size', motionQueue.length);
+                
+                console.log('배치 전송:', {
+                    스터디룸: studyRoomId,
+                    데이터_개수: batchMessage.dataPoints.length
                 });
                 
-                unityInstance.SendMessage(gameObject, method, jsonData);
-            } catch (error) {
-                console.error('Unity 명령 전송 오류:', error);
+            } catch (e) {
+                console.error('배치 전송 실패:', e);
             }
-        };
-
-        // 시각적 Bear 업데이트 함수
-        function updateVisualBear(mode) {
-            const bear = document.getElementById('visualBear');
-            const status = document.getElementById('bearStatus');
-            
-            if (!bear || !status) return;
-            
-            // 기존 클래스 제거
-            bear.className = '';
-            
-            let modeText = '';
-            let message = '';
-            
-            switch(mode) {
-                case '1':
-                    bear.classList.add('bear-mode-1');
-                    modeText = '집중 모드';
-                    message = '🎯 Bear가 집중하고 있습니다!';
-                    break;
-                case '2':
-                    bear.classList.add('bear-mode-2');
-                    modeText = '휴식 모드';
-                    message = '😴 Bear가 휴식을 취하고 있습니다!';
-                    break;
-                case '3':
-                    bear.classList.add('bear-mode-3');
-                    modeText = '활동 모드';
-                    message = '🏃 Bear가 활발하게 움직이고 있습니다!';
-                    break;
-                case 'RESET':
-                case '0':
-                    modeText = '대기 중';
-                    message = '🐻 Bear가 대기하고 있습니다...';
-                    break;
-                default:
-                    modeText = '알 수 없음';
-                    message = '❓ Bear 상태를 확인할 수 없습니다';
-                    break;
-            }
-            
-            status.textContent = `${modeText}: ${message}`;
-            
-            // React Native에 응답 전송
-            setTimeout(() => {
-                SendMessageToReactNative(JSON.stringify({
-                    action: mode === 'RESET' || mode === '0' ? 'bear_reset' : 'showBearStudy',
-                    message: message,
-                    bearMode: mode,
-                    vibrate: true,
-                    vibrationPattern: [0, 200, 100, 200],
-                    timestamp: Date.now()
-                }));
-            }, 300);
         }
-
-        // Unity WebGL 설정
-        const buildUrl = "./Build";
-        const config = {
-            dataUrl: "./Build/Build.data.gz",
-            frameworkUrl: "./Build/Build.framework.js.gz",
-            codeUrl: "./Build/Build.wasm.gz",
-            streamingAssetsUrl: "StreamingAssets",
-            companyName: "SSAFY",
-            productName: "Bear Controller",
-            productVersion: "1.0.0",
-        };
-
-        // Unity 초기화 (실제 Unity 빌드가 있을 때 활성화)
-        function initializeUnity() {
-            const canvas = document.querySelector("#gameCanvas");
-            
-            // 일단 시뮬레이션으로 로딩 진행 (실제 Unity 빌드 전까지)
-            simulateUnityLoading();
-            
-            /* 실제 Unity 빌드가 있을 때 사용할 코드:
-            createUnityInstance(canvas, config, (progress) => {
-                updateLoadingProgress(progress);
-            }).then((instance) => {
-                unityInstance = instance;
-                window.unityInstance = instance;
-                onUnityLoaded();
-            }).catch((message) => {
-                alert("Unity 로딩 실패: " + message);
-            });
-            */
-        }
-
-        // Unity 로딩 시뮬레이션 (테스트용)
-        function simulateUnityLoading() {
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 0.02;
-                updateLoadingProgress(progress);
+        
+        // ===== 세션 시작 =====
+        async function startMotionSession() {
+            try {
+                const url = `${STUDY_BASE}/test/activity/session/start/${studyRoomId}/${myUserId}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+                    }
+                });
                 
-                if (progress >= 1) {
-                    clearInterval(interval);
-                    
-                    // 시뮬레이션 Unity 인스턴스 생성
-                    unityInstance = {
-                        SendMessage: function(gameObject, method, data) {
-                            console.log(`시뮬레이션: ${gameObject}.${method}(${data})`);
-                            
-                            // Bear 동작 시뮬레이션
-                            if (gameObject === 'BearSwitcher' && method === 'OnReactNativeMessage') {
-                                const message = JSON.parse(data);
-                                
-                                setTimeout(() => {
-                                    if (message.data === '1' || message.data === '2' || message.data === '3') {
-                                        SendMessageToReactNative(JSON.stringify({
-                                            action: 'showBearStudy',
-                                            message: `Bear 모드 ${message.data} 활성화!`,
-                                            bearMode: message.data,
-                                            vibrate: true,
-                                            vibrationPattern: [0, 200, 100, 200]
-                                        }));
-                                    }
-                                }, 500);
-                            }
-                        }
-                    };
-                    
-                    window.unityInstance = unityInstance;
-                    onUnityLoaded();
-                }
-            }, 50);
-        }
-
-        // 페이지 로드 시 Unity 초기화
-        window.addEventListener('load', initializeUnity);
-
-        // GitHub Pages에서 상대 경로 문제 해결
-        window.addEventListener('DOMContentLoaded', function() {
-            // GitHub Pages 환경에서 경로 조정
-            if (window.location.hostname.includes('github.io')) {
-                console.log('GitHub Pages 환경 감지됨');
+                console.log('세션 시작:', response.ok ? '성공' : '실패');
+            } catch (e) {
+                console.error('세션 시작 실패:', e);
             }
+        }
+        
+        // ===== React Native에서 메시지 수신 =====
+        window.addEventListener('message', function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.action === 'start_tracking') {
+                    startCapture();
+                } else if (data.action === 'stop_tracking') {
+                    stopCapture();
+                }
+            } catch (e) {
+                console.error('메시지 처리 실패:', e);
+            }
+        });
+        
+        // ===== 유틸리티 함수 =====
+        function round4(v) {
+            return Math.round((v + Number.EPSILON) * 10000) / 10000;
+        }
+        
+        function extractStompBody(data) {
+            const sep = '\n\n';
+            const i = data.indexOf(sep);
+            if (i === -1) return '';
+            let body = data.slice(i + sep.length);
+            if (body.endsWith('\u0000')) body = body.slice(0, -1);
+            return body;
+        }
+        
+        function updateStatus(elementId, value) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = value;
+            }
+        }
+        
+        // ===== 페이지 언로드 시 정리 =====
+        window.addEventListener('beforeunload', function() {
+            stopCapture();
         });
     </script>
 </body>
