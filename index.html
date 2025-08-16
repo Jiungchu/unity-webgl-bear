@@ -23,6 +23,71 @@
             width: 100%;
             height: 100%;
             background: #232323;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* 시각적 Bear 표현 */
+        #visualBear {
+            width: 120px;
+            height: 120px;
+            background: #8B4513;
+            border-radius: 50%;
+            position: relative;
+            transition: all 0.5s ease;
+            cursor: pointer;
+        }
+        
+        /* Bear 귀 */
+        #visualBear::before {
+            content: '';
+            position: absolute;
+            top: -15px;
+            left: 20px;
+            width: 25px;
+            height: 25px;
+            background: #8B4513;
+            border-radius: 50%;
+            box-shadow: 50px 0 0 #8B4513;
+        }
+        
+        /* Bear 얼굴 */
+        #visualBear::after {
+            content: '🐻';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 60px;
+        }
+        
+        /* Bear 모드별 색상 */
+        .bear-mode-1 { 
+            background: #4169E1 !important; 
+            transform: scale(1.2) rotate(90deg);
+        }
+        .bear-mode-2 { 
+            background: #32CD32 !important; 
+            transform: scale(1.1) rotate(180deg);
+        }
+        .bear-mode-3 { 
+            background: #FF6347 !important; 
+            transform: scale(1.3) rotate(270deg);
+        }
+        
+        /* Bear 상태 표시 */
+        #bearStatus {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: bold;
         }
         
         #gameCanvas {
@@ -78,7 +143,10 @@
 <body>
     <div id="gameContainer">
         <div id="unityContainer">
-            <canvas id="gameCanvas"></canvas>
+            <!-- 시각적 Bear 표현 -->
+            <div id="visualBear"></div>
+            <div id="bearStatus">Bear 대기 중...</div>
+            <canvas id="gameCanvas" style="display: none;"></canvas>
         </div>
         
         <div id="loadingBar">
@@ -145,12 +213,15 @@
 
         // React Native에서 Unity로 명령 전송받는 함수
         window.sendCommandToUnity = function(gameObject, method, data) {
+            console.log('RN → Unity:', gameObject, method, data);
+            
+            // 시각적 Bear 업데이트
+            updateVisualBear(data);
+            
             if (!gameLoaded || !unityInstance) {
-                console.log('Unity 아직 준비되지 않음');
+                console.log('Unity 아직 준비되지 않음 (시각적 Bear로 대체)');
                 return;
             }
-            
-            console.log('RN → Unity:', gameObject, method, data);
             
             try {
                 // JSON 문자열로 변환하여 전송
@@ -166,6 +237,61 @@
                 console.error('Unity 명령 전송 오류:', error);
             }
         };
+
+        // 시각적 Bear 업데이트 함수
+        function updateVisualBear(mode) {
+            const bear = document.getElementById('visualBear');
+            const status = document.getElementById('bearStatus');
+            
+            if (!bear || !status) return;
+            
+            // 기존 클래스 제거
+            bear.className = '';
+            
+            let modeText = '';
+            let message = '';
+            
+            switch(mode) {
+                case '1':
+                    bear.classList.add('bear-mode-1');
+                    modeText = '집중 모드';
+                    message = '🎯 Bear가 집중하고 있습니다!';
+                    break;
+                case '2':
+                    bear.classList.add('bear-mode-2');
+                    modeText = '휴식 모드';
+                    message = '😴 Bear가 휴식을 취하고 있습니다!';
+                    break;
+                case '3':
+                    bear.classList.add('bear-mode-3');
+                    modeText = '활동 모드';
+                    message = '🏃 Bear가 활발하게 움직이고 있습니다!';
+                    break;
+                case 'RESET':
+                case '0':
+                    modeText = '대기 중';
+                    message = '🐻 Bear가 대기하고 있습니다...';
+                    break;
+                default:
+                    modeText = '알 수 없음';
+                    message = '❓ Bear 상태를 확인할 수 없습니다';
+                    break;
+            }
+            
+            status.textContent = `${modeText}: ${message}`;
+            
+            // React Native에 응답 전송
+            setTimeout(() => {
+                SendMessageToReactNative(JSON.stringify({
+                    action: mode === 'RESET' || mode === '0' ? 'bear_reset' : 'showBearStudy',
+                    message: message,
+                    bearMode: mode,
+                    vibrate: true,
+                    vibrationPattern: [0, 200, 100, 200],
+                    timestamp: Date.now()
+                }));
+            }, 300);
+        }
 
         // Unity WebGL 설정
         const buildUrl = "./Build";
