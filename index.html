@@ -98,6 +98,11 @@
         </div>
         
         <div id="controls">
+            <div style="margin-bottom: 10px;">
+                <input type="text" id="token-input" placeholder="JWT 토큰을 입력하세요" 
+                       style="width: 200px; padding: 5px; margin-right: 5px; background: rgba(0,0,0,0.8); color: white; border: 1px solid #444;">
+                <button onclick="setToken()">토큰 설정</button>
+            </div>
             <button id="start-btn" onclick="startCapture()">시작</button>
             <button id="stop-btn" onclick="stopCapture()">중지</button>
         </div>
@@ -115,8 +120,8 @@
         const MOUTH_LANDMARKS = [78, 308, 13, 14];          // 4
         const HEAD_POSE_LANDMARKS = [1, 152, 10, 33, 263];  // 5
         
-        const COLLECTION_INTERVAL_MS = 0.5;   // 좌표 수집 throttle
-        const BATCH_FLUSH_MS = 2000;          // 배치 전송 주기
+        const COLLECTION_INTERVAL_MS = 1000;   // 좌표 수집 throttle
+        const BATCH_FLUSH_MS = 10000;          // 배치 전송 주기
         
         // 상태 변수
         let video, canvas, ctx;
@@ -142,7 +147,20 @@
         const urlParams = new URLSearchParams(window.location.search);
         const studyRoomId = urlParams.get('studyRoomId') || '24';
         const myUserId = urlParams.get('myUserId') || '12';
-        const accessToken = urlParams.get('accessToken') || '';
+        let accessToken = urlParams.get('accessToken') || '';
+        
+        // 토큰 설정 함수
+        function setToken() {
+            const tokenInput = document.getElementById('token-input');
+            accessToken = tokenInput.value.trim();
+            if (accessToken) {
+                updateStatus('ws-status', '토큰 설정됨');
+                console.log('토큰이 설정되었습니다:', accessToken.substring(0, 20) + '...');
+            } else {
+                updateStatus('ws-status', '토큰 없음');
+                console.log('토큰이 제거되었습니다');
+            }
+        }
         
         // ===== 초기화 =====
         window.onload = function() {
@@ -293,9 +311,6 @@
                     batchTimer = setInterval(flushBatch, BATCH_FLUSH_MS);
                 }
                 
-                // 세션 시작
-                startMotionSession();
-                
                 document.getElementById('start-btn').classList.add('active');
                 document.getElementById('stop-btn').classList.remove('active');
                 
@@ -336,8 +351,20 @@
         
         // ===== WebSocket 연결 =====
         function connectWebSocket() {
-            if (!accessToken || !studyRoomId) {
-                console.warn('토큰 또는 스터디룸 ID가 없습니다.');
+            console.log('WebSocket 연결 시도:', {
+                accessToken: accessToken ? 'TOKEN_EXISTS' : 'NO_TOKEN',
+                studyRoomId: studyRoomId
+            });
+            
+            if (!accessToken) {
+                console.warn('토큰이 없습니다. 토큰을 먼저 설정하세요.');
+                updateStatus('ws-status', '토큰 필요');
+                return;
+            }
+            
+            if (!studyRoomId) {
+                console.warn('스터디룸 ID가 없습니다.');
+                updateStatus('ws-status', '룸ID 필요');
                 return;
             }
             
@@ -475,24 +502,6 @@
                 
             } catch (e) {
                 console.error('배치 전송 실패:', e);
-            }
-        }
-        
-        // ===== 세션 시작 =====
-        async function startMotionSession() {
-            try {
-                const url = `${STUDY_BASE}/test/activity/session/start/${studyRoomId}/${myUserId}`;
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
-                    }
-                });
-                
-                console.log('세션 시작:', response.ok ? '성공' : '실패');
-            } catch (e) {
-                console.error('세션 시작 실패:', e);
             }
         }
         
