@@ -145,7 +145,7 @@
         
         // URL 파라미터에서 값 추출
         const urlParams = new URLSearchParams(window.location.search);
-        const studyRoomId = urlParams.get('studyRoomId') || '1';
+        const studyRoomId = urlParams.get('studyRoomId') || '24';
         let accessToken = urlParams.get('accessToken') || '';
         
         // 디버깅: 파라미터 추출 확인
@@ -196,6 +196,12 @@
             initializeFaceMesh();
             
             // 토큰이 있으면 자동으로 시작
+            console.log('자동 시작 조건 체크:', {
+                accessToken: accessToken ? 'EXISTS' : 'MISSING',
+                studyRoomId: studyRoomId,
+                condition: !!(accessToken && studyRoomId)
+            });
+            
             if (accessToken && studyRoomId) {
                 console.log('토큰과 방 번호가 있어 자동 시작합니다');
                 setTimeout(() => {
@@ -203,6 +209,8 @@
                 }, 1000); // 1초 후 자동 시작
             } else {
                 console.log('토큰 또는 방 번호가 없어 수동 시작 대기');
+                console.log('accessToken:', accessToken ? 'EXISTS' : 'MISSING');
+                console.log('studyRoomId:', studyRoomId);
             }
         };
         
@@ -313,7 +321,16 @@
         
         // ===== 카메라 시작 =====
         async function startCapture() {
+            console.log('=== startCapture 함수 호출됨 ===');
+            console.log('현재 환경:', {
+                userAgent: navigator.userAgent,
+                isReactNativeWebView: !!window.ReactNativeWebView,
+                mediaDevices: !!navigator.mediaDevices,
+                getUserMedia: !!navigator.mediaDevices?.getUserMedia
+            });
+            
             try {
+                console.log('카메라 권한 요청 시작...');
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { 
                         facingMode: 'user',
@@ -321,6 +338,7 @@
                         height: { ideal: 480 }
                     }
                 });
+                console.log('카메라 권한 획득 성공:', stream);
                 
                 video.srcObject = stream;
                 
@@ -335,21 +353,43 @@
                 });
                 
                 isActive = true;
+                console.log('카메라 시작 완료');
                 camera.start();
                 
                 // WebSocket 연결
+                console.log('WebSocket 연결 시도...');
                 connectWebSocket();
                 
                 // 배치 타이머 시작
                 if (!batchTimer) {
                     batchTimer = setInterval(flushBatch, BATCH_FLUSH_MS);
+                    console.log('배치 타이머 시작됨');
                 }
                 
                 document.getElementById('start-btn').classList.add('active');
                 document.getElementById('stop-btn').classList.remove('active');
                 
+                console.log('=== startCapture 완료 ===');
+                
             } catch (err) {
                 console.error('카메라 시작 실패:', err);
+                console.error('에러 상세:', {
+                    name: err.name,
+                    message: err.message,
+                    constraint: err.constraint
+                });
+                
+                // React Native로 에러 전달
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'camera_error',
+                        error: {
+                            name: err.name,
+                            message: err.message
+                        }
+                    }));
+                }
+                
                 alert('카메라 접근 권한이 필요합니다.');
             }
         }
