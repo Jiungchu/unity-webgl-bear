@@ -146,7 +146,6 @@
         // URL 파라미터에서 값 추출
         const urlParams = new URLSearchParams(window.location.search);
         const studyRoomId = urlParams.get('studyRoomId') || '24';
-        const myUserId = urlParams.get('myUserId') || '12';
         let accessToken = urlParams.get('accessToken') || '';
         
         // 토큰 설정 함수
@@ -170,6 +169,16 @@
             
             updateStatus('facemesh-status', '초기화 중...');
             initializeFaceMesh();
+            
+            // 토큰이 있으면 자동으로 시작
+            if (accessToken && studyRoomId) {
+                console.log('토큰과 방 번호가 있어 자동 시작합니다');
+                setTimeout(() => {
+                    startCapture();
+                }, 1000); // 1초 후 자동 시작
+            } else {
+                console.log('토큰 또는 방 번호가 없어 수동 시작 대기');
+            }
         };
         
         // ===== MediaPipe FaceMesh 초기화 =====
