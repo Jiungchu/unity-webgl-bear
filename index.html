@@ -145,8 +145,17 @@
         
         // URL 파라미터에서 값 추출
         const urlParams = new URLSearchParams(window.location.search);
-        const studyRoomId = urlParams.get('studyRoomId') || '24';
+        const studyRoomId = urlParams.get('studyRoomId') || '1';
         let accessToken = urlParams.get('accessToken') || '';
+        
+        // 디버깅: 파라미터 추출 확인
+        console.log('=== 파라미터 추출 결과 ===');
+        console.log('전체 URL:', window.location.href);
+        console.log('search 부분:', window.location.search);
+        console.log('추출된 studyRoomId:', studyRoomId);
+        console.log('추출된 accessToken 길이:', accessToken.length);
+        console.log('추출된 accessToken 앞 20자:', accessToken.substring(0, 20));
+        console.log('========================');
         
         // 토큰 설정 함수
         function setToken() {
@@ -169,7 +178,7 @@
             
             updateStatus('facemesh-status', '초기화 중...');
             
-            // 디버깅: React Native로 파라미터 전달
+            // 디버깅: React Native로 파라미터 전달  
             if (window.ReactNativeWebView) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'webview_debug',
@@ -177,7 +186,9 @@
                         currentURL: window.location.href,
                         studyRoomId: studyRoomId,
                         accessToken: accessToken ? 'EXISTS' : 'MISSING',
-                        urlParams: window.location.search
+                        accessTokenLength: accessToken.length,
+                        urlParams: window.location.search,
+                        userAgent: navigator.userAgent.includes('ReactNativeWebView') ? 'ReactNative' : 'Browser'
                     }
                 }));
             }
