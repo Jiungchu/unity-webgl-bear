@@ -168,6 +168,20 @@
             ctx = canvas.getContext('2d');
             
             updateStatus('facemesh-status', '초기화 중...');
+            
+            // 디버깅: React Native로 파라미터 전달
+            if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'webview_debug',
+                    data: {
+                        currentURL: window.location.href,
+                        studyRoomId: studyRoomId,
+                        accessToken: accessToken ? 'EXISTS' : 'MISSING',
+                        urlParams: window.location.search
+                    }
+                }));
+            }
+            
             initializeFaceMesh();
             
             // 토큰이 있으면 자동으로 시작
