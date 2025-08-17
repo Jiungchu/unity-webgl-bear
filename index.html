@@ -331,13 +331,39 @@
             
             try {
                 console.log('카메라 권한 요청 시작...');
-                const stream = await navigator.mediaDevices.getUserMedia({
+                console.log('navigator.mediaDevices 지원:', !!navigator.mediaDevices);
+                console.log('getUserMedia 지원:', !!navigator.mediaDevices?.getUserMedia);
+                
+                // 권한 상태 확인 (가능한 경우)
+                if (navigator.permissions) {
+                    try {
+                        const permission = await navigator.permissions.query({ name: 'camera' });
+                        console.log('카메라 권한 상태:', permission.state);
+                    } catch (e) {
+                        console.log('권한 상태 확인 불가:', e.message);
+                    }
+                }
+                
+                // 타임아웃 추가하여 무한 대기 방지
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => {
+                        console.log('카메라 권한 요청 타임아웃 (10초)');
+                        reject(new Error('카메라 권한 요청 타임아웃'));
+                    }, 10000);
+                });
+                
+                console.log('getUserMedia 호출 직전...');
+                const mediaPromise = navigator.mediaDevices.getUserMedia({
                     video: { 
                         facingMode: 'user',
                         width: { ideal: 640 },
                         height: { ideal: 480 }
                     }
                 });
+                console.log('getUserMedia 호출 완료, Promise 생성됨');
+                
+                const stream = await Promise.race([mediaPromise, timeoutPromise]);
+                console.log('Promise.race 완료');
                 console.log('카메라 권한 획득 성공:', stream);
                 
                 video.srcObject = stream;
